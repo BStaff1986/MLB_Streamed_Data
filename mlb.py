@@ -2,23 +2,28 @@
 
 import requests
 import json
-
+from bs4 import BeautifulSoup
 
 def get_play_data():
-    url = 'http://gd2.mlb.com/components/game/mlb/'
-    year = '/year_2017'
-    month = '/month_05'
-    day = '/day_08'
-    game = '/gid_2017_05_08_clemlb_tormlb_1/plays.json'
-    r = requests.get(url + year + month + day + game)
-    data = json.loads(r.text)
-    return data	
+	'''
+	This function combines the component parts of MLB Gameday's URL
+	'''
+	url = 'http://gd2.mlb.com/components/game/mlb/'
+	year = '/year_2017'
+	month = '/month_05'
+	day = '/day_08'
+	game = '/gid_2017_05_08_clemlb_tormlb_1'
+	xml = '/game_events.xml'
+	r = requests.get(url + year + month + day + game + xml)
+	soup = BeautifulSoup(r.text, features='lxml-xml') 
+	return soup
 
+def find_atbat(xml):
+	atbat_num = 1
+	atbat_data = xml.find('atbat', {'num' : atbat_num})
+	print(atbat_data)
+	return
 
-def print_count(json):
-    print('Balls: {data[b]} Strikes: {data[s]} Outs: {data[o]}'.format\
-    (data=json['data']['game']))
+xml = get_play_data()
+find_atbat(xml)
 
-data  = get_play_data()
-
-print_count(data)
