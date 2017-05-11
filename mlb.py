@@ -26,4 +26,6 @@ def find_atbat(xml):
 
 xml = get_play_data()
 find_atbat(xml)
+print('Play ball!')
+
 
