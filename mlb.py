@@ -1,72 +1,123 @@
-# Program to read MLB XML Data
+# Program to read MLB JSON Data
 
-# TODO: Fix issue where only final pitch of atbat appears.
+# TODO: Future issue - Starting program before game and having program
+# 		become unstable from get_game_events()
 
 import requests
 import json
 import subprocess as sp
 from time import sleep 
+from pprint import pprint as pp
 from bs4 import BeautifulSoup
 
 class MLB_Scrape():
 	def __init__(self):
-		self.inning = 0
 		self.ab_num = 0
 		self.pitch_id = 0
-		self.xml = ''
+		self.json_events = ''
+		self.roster = {}
+
+		self.url = 'http://gd2.mlb.com/components/game/mlb/'
+		self.year = '/year_2017'
+		self.month = '/month_05'
+		self.day = '/day_11'
+		self.game = '/gid_2017_05_11_detmlb_anamlb_1' 
+		self.game_url = (self.url + self.year + self.month +
+						self.day + self.game)
+		print(self.game_url)
 
 	def get_game_events(self):
 		'''
-		This function combines the component parts of MLB Gameday's URL
+		This function gets the game events JSON data from MLB.com	
 		'''
-		url = 'http://gd2.mlb.com/components/game/mlb/'
-		year = '/year_2017'
-		month = '/month_05'
-		day = '/day_11'
-		game = '/gid_2017_05_11_seamlb_tormlb_1' 
-		xml_link = '/game_events.xml'
 
-		r = requests.get(url + year + month + day + game + xml_link)
-		self.xml = BeautifulSoup(r.text, features='lxml-xml') 
+		json_link = '/game_events.json'
+		r = requests.get(self.game_url + json_link)
+		self.json_events = json.loads(r.text) 
+
+	def get_rosters(self):			
+		'''
+		This function gets the XML roster data and returns a dictionary
+		which contains data about the player
+		'''
+		xml_link = '/players.xml'
+		r = requests.get (self.game_url + xml_link)
+		soup = BeautifulSoup(r.text, features='lxml-xml')
+
+		home = soup.team
+		away = home.find_next('team')
+
+		teams = [away, home]
+		rosters = {}
+		p_info = {}
+		for team in teams:
+			team_name = team.get('id')
+			for player in team.find_all('player'):
+				id_num = player.get('id')
+				f_name = player.get('first')
+				l_name = player.get('last')
+				p_info[id_num] = f_name + ' ' + l_name
+
+				rosters[team_name] = p_info
+
+		return soup, home, away, rosters
+
+	def get_inning(self):
+		'''
+		This function parses the XML data finds the current inning
+		'''
+		inning = self.json_events['data']['game']['inning']
+		inning_num = len(inning) - 1
 		
-	def get_atbat_info(self):
-		'''
-		This function parses the XML data and prints the desired data
-		'''
-		self.ab_num = len(self.xml.find_all('atbat'))
-
-	def get_last_pitch_info(self):
-		all_pitch = self.xml.find_all('pitch')
-		last_pitch_num = len(all_pitch) - 1
-		
-		last_pitch = all_pitch[last_pitch_num]
-		pitch_id = int(last_pitch['sv_id'].replace("_",""))
-
-		if pitch_id > self.pitch_id:
-			self.pitch_id = pitch_id
-			pitch_speed = last_pitch['start_speed']
-			pitch_type = last_pitch['pitch_type']
-			return (pitch_speed, pitch_type)
+		if not inning[inning_num]: 
+			top_or_bottom = 'top'
 		else:
-			return (None, None)
+			top_or_bottom = 'bottom'
+		
+		return (top_or_bottom, inning_num)
+
+	def get_current_atbat(self):
+		'''
+		This function gets the data from the last pitch
+		'''
+		t_or_b, inn_num = self.get_inning()
+		try:
+			atbat = self.json_events['data']['game']['inning'][inn_num][t_or_b]['atbat']
+		except: # Find the name of the error and make this stronger!
+			return None
+		
+		current_atbat = atbat[len(atbat) -1]
+		
+		return current_atbat
+	
+	def get_last_pitch(self):
+		'''
+		This function gets the pitch speed and type from the most
+		recent pitch
+		'''
+		current_ab = self.get_current_atbat()
+
+		pitches = current_ab['pitch']
+		last_pitch = pitches[len(pitches) -1]
+		
+		pitch_speed = last_pitch['start_speed']
+		pitch_type = last_pitch['pitch_type']
+
+		return pitch_speed, pitch_type
 
 	def pitch_update(self):
 		'''
-		This is the executive function which obtains all desired data
-		and prints it to the command line.
+		This is the executive function that gets refreshed continuously
 		'''
 		self.get_game_events()
-		ab_info = self.get_atbat_info()
-		speed, pitch_type = self.get_last_pitch_info()
-		
-		if speed and pitch_type:
-			print('Pitch Speed: {} Pitch Type: {}'.format(speed, pitch_type))
-			return
-		else:
-			return
-		
+		speed, p_type = self.get_last_pitch()
+
+		print('Pitch Speed: {} Pitch Type: {}'.format(speed, p_type))
+
+
+
 sp.call('clear',shell=True)
 mlb = MLB_Scrape()
-while True:
-	sleep(3)
-	mlb.pitch_update()
+mlb.pitch_update()
+
+ros, away, home, dic = mlb.get_rosters()
