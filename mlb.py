@@ -2,6 +2,9 @@
 
 # mlb.py :  Program to read and display MLB JSON Data
 
+# TODO: Make a function that delays the printing of result
+# 		in a way that the result appears on computer after Roku TV broadcast
+
 # TODO: Future issue - Starting program before game and having program
 # 		become unstable from get_game_events()
 
@@ -93,7 +96,10 @@ class MLB_Scrape():
 		'''
 		game = self.plays_json['data']['game']
 		current_ab = game['atbat']
-		n_pitches = len(current_ab['p']) - 1 # Minus 1 for zero-index
+		try:
+			n_pitches = len(current_ab['p']) - 1 # Minus 1 for zero-index
+		except KeyError:
+			return None
 		try:
 			last_pitch = current_ab['p'][n_pitches]
 		except KeyError:
@@ -142,4 +148,4 @@ sp.call('clear',shell=True)
 mlb = MLB_Scrape()
 while True:
 	mlb.pitch_update()
-	sleep(22)
+	sleep(3)
